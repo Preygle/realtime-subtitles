@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rtsubs"
+version = "0.1.0"
+license = "MIT"
+description = "Live, local, translated subtitles for anything playing on your PC"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "requests>=2.31",
+    "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+gui = ["PySide6>=6.6"]
+audio = ["PyAudioWPatch>=0.2.12; sys_platform == 'win32'", "soundcard>=0.4.3"]
+fast = ["soxr>=0.3"]
+vad = ["onnxruntime>=1.17"]
+nllb = ["ctranslate2>=4.0", "transformers>=4.40", "sentencepiece>=0.2"]
+bench = ["rapidfuzz>=3.0", "pykakasi>=2.2"]
+
+[project.scripts]
+rtsubs = "rtsubs.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 90
+target-version = "py310"

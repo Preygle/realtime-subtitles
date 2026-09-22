@@ -1,0 +1,28 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # The app targets Windows (WASAPI loopback, Win32 click-through), so test there.
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . pytest
+      # No model weights or GPU on CI: the Silero tests skip themselves, and
+      # the ASR/translation backends are exercised through mocks and a stub
+      # whisper.cpp HTTP server.
+      - name: Test
+        run: python -m pytest tests/ -q

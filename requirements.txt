@@ -1,0 +1,17 @@
+# --- core pipeline ---
+numpy>=1.26
+requests>=2.31
+scipy>=1.11          # polyphase resampling (soxr is used instead when present)
+
+# --- UI ---
+PySide6>=6.6         # overlay + control panel
+
+# --- audio capture (Windows WASAPI loopback) ---
+PyAudioWPatch>=0.2.12 ; sys_platform == "win32"
+soundcard>=0.4.3     # pure-Python fallback when PyAudioWPatch has no wheel
+
+# --- optional, install as needed ---
+# soxr>=0.3                  # faster/cleaner resampling than scipy
+# onnxruntime>=1.17          # Silero VAD (much better than the energy fallback)
+# ctranslate2>=4.0           # NLLB translation backend
+# transformers>=4.40         # NLLB tokenizer

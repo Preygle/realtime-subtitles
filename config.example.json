@@ -1,0 +1,66 @@
+{
+  "audio": {
+    "source": "loopback",
+    "device_name": "",
+    "backend": "auto",
+    "block_ms": 32,
+    "gain_db": 0.0
+  },
+  "vad": {
+    "engine": "auto",
+    "threshold": 0.5,
+    "energy_dbfs": -42.0,
+    "min_silence_ms": 480,
+    "min_speech_ms": 220,
+    "speech_pad_ms": 300
+  },
+  "segmenter": {
+    "max_segment_sec": 12.0,
+    "partial_interval_ms": 700,
+    "min_partial_ms": 600,
+    "carry_over_ms": 320
+  },
+  "asr": {
+    "backend": "llamacpp",
+    "base_url": "http://127.0.0.1:8090",
+    "model": "Confucius4-R2T2",
+    "whisper_base_url": "http://127.0.0.1:8082",
+    "whisper_translate": true,
+    "language": "",
+    "context_prompt": "",
+    "timeout_sec": 30.0,
+    "history_turns": 0
+  },
+  "translate": {
+    "backend": "llamacpp",
+    "target_language": "English",
+    "base_url": "http://127.0.0.1:8081",
+    "model": "qwen3-4b-instruct",
+    "temperature": 0.2,
+    "max_tokens": 256,
+    "timeout_sec": 30.0,
+    "history_turns": 2,
+    "ct2_model_dir": "models/nllb-200-distilled-600M-ct2",
+    "ct2_tokenizer": "facebook/nllb-200-distilled-600M",
+    "ct2_device": "cpu",
+    "ct2_compute_type": "int8",
+    "translate_partials": true,
+    "partial_throttle_ms": 450,
+    "skip_if_target": true
+  },
+  "overlay": {
+    "font_family": "Segoe UI",
+    "font_size": 20,
+    "background_opacity": 0.55,
+    "text_color": "#FFFFFF",
+    "partial_color": "#C8D4E8",
+    "outline_width": 3,
+    "vertical_anchor": 0.86,
+    "width_fraction": 0.78,
+    "max_lines": 2,
+    "hold_sec": 6.0,
+    "locked": true,
+    "show_source_text": false
+  },
+  "log_level": "INFO"
+}

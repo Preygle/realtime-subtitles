@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Model weights and runtime state -- never commit these.
+models/
+logs/
+config.json
+
+# Benchmark media and reference transcripts are copyrighted; fetched locally only.
+bench/
