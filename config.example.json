@@ -64,5 +64,14 @@
     "locked": true,
     "show_source_text": false
   },
+  "export": {
+    "enabled": false,
+    "formats": [
+      "srt",
+      "txt"
+    ],
+    "directory": "transcripts",
+    "include_original": true
+  },
   "log_level": "INFO"
 }

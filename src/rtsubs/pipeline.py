@@ -48,6 +48,10 @@ class SubtitleEvent:
     translate_latency: float = 0.0
     #: Wall-clock seconds from end of the audio segment to this event.
     total_latency: float = 0.0
+    #: When the line was spoken, in seconds of audio since capture started,
+    #: and how long it lasted. Used to time subtitle files.
+    start_time: float = 0.0
+    duration: float = 0.0
 
 
 @dataclass
@@ -153,6 +157,8 @@ class SubtitlePipeline:
         self._asr_history: deque[str] = deque(maxlen=8)
         self._last_partial_translation = 0.0
         self._lock = threading.Lock()
+        #: Saves finished lines to disk when export is enabled.
+        self._recorder = None
 
     # ------------------------------------------------------------------
     @property
@@ -183,6 +189,20 @@ class SubtitlePipeline:
         self._source = self._explicit_source or create_source(self.cfg.audio)
         self._source.start()
         self._on_status("info", f"Audio: {self._source.description}")
+
+        if self.cfg.export.enabled:
+            from .export import TranscriptRecorder
+
+            try:
+                self._recorder = TranscriptRecorder(
+                    self.cfg.export,
+                    source_description=self._source.description.split(":", 1)[-1],
+                    target_language=self.cfg.translate.target_language,
+                )
+                self._on_status("info", f"Saving transcript: {self._recorder.describe()}")
+            except OSError as exc:
+                # Captioning still works; only saving is unavailable.
+                self._on_status("error", f"Cannot save transcript: {exc}")
 
         for target, name in (
             (self._audio_loop, "rtsubs-audio"),
@@ -216,6 +236,15 @@ class SubtitlePipeline:
         self._source = None
         self._asr_queue.clear()
         self._translate_queue.clear()
+        # Closed only after the worker threads have flushed the last line.
+        if self._recorder is not None:
+            recorder, self._recorder = self._recorder, None
+            recorder.close()
+            if recorder.lines_written:
+                self._on_status(
+                    "info",
+                    f"Saved {recorder.lines_written} lines: {recorder.describe()}",
+                )
         self._on_status("info", "Pipeline stopped")
 
     def clear_history(self) -> None:
@@ -410,7 +439,15 @@ class SubtitlePipeline:
             asr_latency=job.transcript.latency,
             translate_latency=translate_latency,
             total_latency=total,
+            start_time=segment.start_time,
+            duration=segment.duration,
         )
+        if event.is_final and self._recorder is not None:
+            try:
+                self._recorder.write(event)
+            except Exception:
+                # A full disk must not stop the subtitles themselves.
+                log.exception("could not write transcript line")
         try:
             self._on_event(event)
         except Exception:

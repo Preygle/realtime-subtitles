@@ -151,6 +151,20 @@ class OverlayConfig:
 
 
 @dataclass
+class ExportConfig:
+    #: Save finished lines to disk while captioning. Off unless chosen, since
+    #: it records other people's speech.
+    enabled: bool = False
+    #: Any of "srt", "vtt", "txt".
+    formats: list[str] = field(default_factory=lambda: ["srt", "txt"])
+    #: Relative paths are resolved against the project folder.
+    directory: str = "transcripts"
+    #: In the .txt transcript, also show the original-language line under
+    #: each translation.
+    include_original: bool = True
+
+
+@dataclass
 class AppConfig:
     audio: AudioConfig = field(default_factory=AudioConfig)
     vad: VadConfig = field(default_factory=VadConfig)
@@ -158,6 +172,7 @@ class AppConfig:
     asr: AsrConfig = field(default_factory=AsrConfig)
     translate: TranslateConfig = field(default_factory=TranslateConfig)
     overlay: OverlayConfig = field(default_factory=OverlayConfig)
+    export: ExportConfig = field(default_factory=ExportConfig)
     log_level: str = "INFO"
 
     # ------------------------------------------------------------------

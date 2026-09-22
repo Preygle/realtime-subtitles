@@ -30,6 +30,7 @@ one app, or need an NVIDIA card. This one:
 - 🌏 **30 languages → English.** Auto-detects the spoken language, or you pick one.
 - 🟥 **Works on AMD GPUs.** Uses llama.cpp's Vulkan backend: no CUDA, no ROCm, no DirectML. Vulkan also covers NVIDIA and Intel GPUs (untested so far).
 - 🪟 **Click-through overlay.** Subtitles float on top of everything and your mouse passes straight through them.
+- 📝 **Saves transcripts.** Optionally records every line as `.srt` / `.vtt` subtitles or a timestamped `.txt` transcript — handy for meeting notes or summaries.
 - 📜 **Stable text.** Committed lines never rewrite themselves — no flickering, no words changing while you read.
 - 🧪 **Measured, not claimed.** Benchmarked against a human transcript of a full hour of real conversation ([below](#-benchmark-1-hour-of-real-japanese-conversation)).
 
@@ -268,12 +269,30 @@ python -m rtsubs --source input                 # caption your microphone instea
 python -m rtsubs --language Japanese            # skip auto-detect
 python -m rtsubs --target Spanish               # subtitles in another language
 python -m rtsubs --wav clip.wav                 # caption a recording
+python -m rtsubs --save srt,txt                 # also save subtitles + a transcript
 ```
 
 - **Ctrl + Shift + S** hides/shows the subtitles without stopping recognition.
 - Uncheck **Click-through** in the control panel to drag the subtitles somewhere else.
 - **Hotwords / context** takes names or jargon (e.g. a streamer's name, game terms) to improve recognition of them.
 - All settings are saved to `config.json`; `config.example.json` lists every option.
+
+### Saving subtitles and transcripts
+
+Turn on **Save transcript** in the control panel (or pass `--save srt,vtt,txt`)
+and every finished line is written to `transcripts\` as it happens, one set of
+files per session:
+
+| Format | Use it for |
+|---|---|
+| `.srt` | Subtitles for VLC, MPC, video editors — load it alongside a recording made at the same time |
+| `.vtt` | Subtitles for browsers and video platforms |
+| `.txt` | A readable transcript with clock times, e.g. `[14:04:05] It might rain tomorrow.`, optionally with the original-language line underneath. Paste it into any AI to summarize a meeting. |
+
+Lines are flushed to disk immediately, so a crash loses at most the sentence
+being spoken; sessions with no speech leave no files behind. Saving is off by
+default — it records other people's speech, so check that's OK where you are.
+Long lines are split to the subtitle standard of two lines of 42 characters.
 
 ---
 
@@ -368,7 +387,6 @@ translate poorly.
 
 - [ ] Native R2T2 streaming (`unfixed_token_num`) for 200–600 ms latency, once a llama.cpp-compatible path exists
 - [ ] Per-app audio capture (caption one window while ignoring others)
-- [ ] Subtitle export to `.srt` while captioning
 - [ ] Linux support (PipeWire loopback)
 - [ ] Packaged installer
 

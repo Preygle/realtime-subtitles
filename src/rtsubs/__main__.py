@@ -5,6 +5,7 @@
     python -m rtsubs --devices            # list capture devices and exit
     python -m rtsubs --check              # probe the model servers and exit
     python -m rtsubs --wav clip.wav --asr mock --translate passthrough
+    python -m rtsubs --console --save srt,txt   # also save subtitles + transcript
 """
 
 from __future__ import annotations
@@ -65,6 +66,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--translate-url")
     parser.add_argument("--target", help="subtitle language (default: English)")
     parser.add_argument("--vad", choices=("auto", "silero", "energy"))
+    parser.add_argument(
+        "--save",
+        metavar="FORMATS",
+        help="save finished lines as any of srt,vtt,txt (comma-separated), e.g. --save srt,txt",
+    )
+    parser.add_argument("--save-dir", help="folder for saved transcripts (default: transcripts)")
     parser.add_argument("--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"))
     return parser
 
@@ -95,6 +102,17 @@ def apply_overrides(cfg: AppConfig, args: argparse.Namespace) -> None:
         cfg.vad.engine = args.vad
     if args.log_level:
         cfg.log_level = args.log_level
+    if args.save:
+        from .export import FORMATS
+
+        wanted = [f.strip().lower().lstrip(".") for f in args.save.split(",") if f.strip()]
+        unknown = [f for f in wanted if f not in FORMATS]
+        if unknown:
+            raise SystemExit(f"--save: unknown format(s) {unknown}; choose from {list(FORMATS)}")
+        cfg.export.enabled = True
+        cfg.export.formats = wanted
+    if args.save_dir:
+        cfg.export.directory = args.save_dir
 
 
 def cmd_devices() -> int:

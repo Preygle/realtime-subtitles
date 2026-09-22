@@ -89,6 +89,7 @@ class ControlPanel(QWidget):
         layout.addWidget(self._build_audio_group())
         layout.addWidget(self._build_model_group())
         layout.addWidget(self._build_overlay_group())
+        layout.addWidget(self._build_export_group())
         layout.addWidget(self._build_controls())
         layout.addWidget(self._build_log(), stretch=1)
 
@@ -270,6 +271,71 @@ class ControlPanel(QWidget):
 
         return box
 
+    def _build_export_group(self) -> QGroupBox:
+        box = QGroupBox("Save transcript")
+        grid = QGridLayout(box)
+
+        self.export_check = QCheckBox("Save finished lines to disk")
+        self.export_check.setToolTip(
+            "Records every finished subtitle line while captioning runs.\n"
+            "A new set of files is started each time you press Start."
+        )
+        self.export_check.stateChanged.connect(self._on_export_toggled)
+        grid.addWidget(self.export_check, 0, 0, 1, 2)
+
+        self.export_format_checks = {}
+        formats = QHBoxLayout()
+        for fmt, label, tip in (
+            ("srt", "Subtitles (.srt)", "Standard subtitle file for VLC, MPC and video editors"),
+            ("vtt", "Web subtitles (.vtt)", "For browsers and video platforms"),
+            ("txt", "Text transcript (.txt)", "Timestamped plain text, easy to read or summarize"),
+        ):
+            check = QCheckBox(label)
+            check.setToolTip(tip)
+            self.export_format_checks[fmt] = check
+            formats.addWidget(check)
+        formats.addStretch(1)
+        formats_widget = QWidget()
+        formats_widget.setLayout(formats)
+        grid.addWidget(formats_widget, 1, 0, 1, 4)
+
+        self.export_original_check = QCheckBox("Include original-language text in .txt")
+        grid.addWidget(self.export_original_check, 2, 0, 1, 2)
+
+        grid.addWidget(QLabel("Folder"), 3, 0)
+        self.export_dir_edit = QLineEdit()
+        grid.addWidget(self.export_dir_edit, 3, 1, 1, 2)
+        open_button = QPushButton("Open folder")
+        open_button.clicked.connect(self._open_export_folder)
+        grid.addWidget(open_button, 3, 3)
+
+        self.export_group = box
+        return box
+
+    def _on_export_toggled(self) -> None:
+        enabled = self.export_check.isChecked()
+        for widget in (
+            *self.export_format_checks.values(),
+            self.export_original_check,
+            self.export_dir_edit,
+        ):
+            widget.setEnabled(enabled)
+
+    def _export_folder(self):
+        from pathlib import Path
+
+        from ..config import PROJECT_ROOT
+
+        folder = Path(self.export_dir_edit.text().strip() or self.cfg.export.directory)
+        return folder if folder.is_absolute() else PROJECT_ROOT / folder
+
+    def _open_export_folder(self) -> None:
+        import os
+
+        folder = self._export_folder()
+        folder.mkdir(parents=True, exist_ok=True)
+        os.startfile(folder)  # Windows: opens it in Explorer
+
     def _build_controls(self) -> QWidget:
         widget = QWidget()
         row = QHBoxLayout(widget)
@@ -319,6 +385,12 @@ class ControlPanel(QWidget):
         self.anchor_spin.setValue(cfg.overlay.vertical_anchor)
         self.lock_check.setChecked(cfg.overlay.locked)
         self.source_text_check.setChecked(cfg.overlay.show_source_text)
+        self.export_check.setChecked(cfg.export.enabled)
+        for fmt, check in self.export_format_checks.items():
+            check.setChecked(fmt in cfg.export.formats)
+        self.export_original_check.setChecked(cfg.export.include_original)
+        self.export_dir_edit.setText(cfg.export.directory)
+        self._on_export_toggled()
 
     def commit_to_config(self) -> None:
         """Copy every widget value back into ``self.cfg``."""
@@ -345,6 +417,14 @@ class ControlPanel(QWidget):
         cfg.translate.target_language = self.target_combo.currentData()
 
         self._commit_overlay_config()
+        self._commit_export_config()
+
+    def _commit_export_config(self) -> None:
+        export = self.cfg.export
+        export.enabled = self.export_check.isChecked()
+        export.formats = [f for f, c in self.export_format_checks.items() if c.isChecked()]
+        export.include_original = self.export_original_check.isChecked()
+        export.directory = self.export_dir_edit.text().strip() or export.directory
 
     def _commit_overlay_config(self) -> None:
         overlay = self.cfg.overlay
@@ -441,6 +521,7 @@ class ControlPanel(QWidget):
         # Capture and model settings cannot change mid-run.
         self.audio_group.setEnabled(not running)
         self.model_group.setEnabled(not running)
+        self.export_group.setEnabled(not running)
         if running:
             self._tick.start()
         else:

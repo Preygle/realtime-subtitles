@@ -12,3 +12,6 @@ config.json
 
 # Benchmark media and reference transcripts are copyrighted; fetched locally only.
 bench/
+
+# Saved subtitles/transcripts may contain private conversations.
+transcripts/
