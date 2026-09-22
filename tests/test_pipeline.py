@@ -438,3 +438,88 @@ def test_segmenter_finds_real_speech_with_silero():
         events.extend(segmenter.feed(audio[i : i + 512]))
     events.extend(segmenter.flush())
     assert [e for e in events if e.is_final], "no utterance detected in real speech"
+
+
+# ------------------------------------------------------- display timing
+def test_display_time_scales_with_length_and_is_clamped():
+    from rtsubs.ui.timing import display_seconds
+
+    assert display_seconds("Hi.", 15, 2.0, 6.0) == 2.0          # short: floor
+    assert display_seconds("x" * 45, 15, 2.0, 6.0) == 3.0      # 45 chars @ 15/s
+    assert display_seconds("x" * 500, 15, 2.0, 6.0) == 6.0     # long: cap
+    assert display_seconds("x" * 30, 0, 2.0, 6.0) == 2.0       # bad cps falls back
+
+
+# ------------------------------------------------------------ live line
+class _RecordingTranslator:
+    """Marks its output so tests can tell translated text from source text."""
+
+    name = "recording"
+
+    def __init__(self):
+        self.calls = []
+
+    def translate(self, request):
+        from rtsubs.translate import Translation
+
+        self.calls.append(request)
+        return Translation(text="EN:" + request.text)
+
+    def health(self):
+        return True, "recording"
+
+    def close(self):
+        pass
+
+
+def _run_live_mode(mode, tmp_path, throttle_ms=0):
+    wav = tmp_path / "speech.wav"
+    stream = np.concatenate([silence(0.4), speech_like(3.0), silence(0.9)])
+    wav.write_bytes(dsp.encode_wav(stream, SAMPLE_RATE))
+
+    cfg = AppConfig()
+    cfg.asr.backend = "mock"
+    cfg.asr.language = "Japanese"
+    cfg.translate.backend = "passthrough"
+    cfg.translate.partial_throttle_ms = throttle_ms
+    cfg.vad.engine = "energy"
+    cfg.overlay.live_line = mode
+
+    events = []
+    pipeline = SubtitlePipeline(cfg, on_event=events.append, source=WavFileSource(str(wav)))
+    pipeline.start()
+    translator = _RecordingTranslator()
+    pipeline._translator = translator
+    deadline = time.time() + 20
+    while time.time() < deadline and pipeline._source.running:
+        time.sleep(0.05)
+    time.sleep(1.5)
+    pipeline.stop()
+    return events, translator, pipeline
+
+
+def test_live_line_off_shows_each_sentence_once(tmp_path):
+    events, translator, pipeline = _run_live_mode("off", tmp_path)
+    assert [e.is_final for e in events] == [True]
+    assert events[0].text.startswith("EN:")
+    # In-progress lines are never transcribed or translated at all.
+    assert pipeline.stats.segments_transcribed == 1
+    assert len(translator.calls) == 1
+
+
+def test_live_line_original_shows_untranslated_partials(tmp_path):
+    events, translator, _ = _run_live_mode("original", tmp_path)
+    partials = [e for e in events if not e.is_final]
+    assert partials, "expected live updates"
+    assert not any(e.text.startswith("EN:") for e in partials)
+    assert [e.text.startswith("EN:") for e in events if e.is_final] == [True]
+    assert len(translator.calls) == 1  # only the finished line
+
+
+def test_live_line_translated_never_flashes_source_text(tmp_path):
+    """Regression: throttled live updates used to show the untranslated text."""
+    # A huge throttle means every live update after the first is rate-limited,
+    # which is exactly the path that used to leak untranslated text.
+    events, translator, _ = _run_live_mode("translated", tmp_path, throttle_ms=60_000)
+    assert [e for e in events if not e.is_final], "expected live updates"
+    assert all(e.text.startswith("EN:") for e in events)

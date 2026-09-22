@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from collections import deque
 
 from PySide6.QtCore import Qt, QTimer, Signal
@@ -33,6 +34,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QWidget
 
 from ..config import OverlayConfig
+from .timing import display_seconds
 
 log = logging.getLogger(__name__)
 
@@ -82,8 +84,11 @@ class SubtitleOverlay(QWidget):
         super().__init__()
         self.cfg = cfg
 
-        self._committed: deque[str] = deque(maxlen=max(1, cfg.max_lines))
+        # (text, monotonic time it expires). Each line gets its own reading
+        # time, so a short line doesn't linger just because a long one did.
+        self._committed: deque[tuple[str, float]] = deque(maxlen=max(1, cfg.max_lines))
         self._live = ""
+        self._live_expires = 0.0
         self._source_line = ""
         self._drag_origin = None
 
@@ -101,10 +106,11 @@ class SubtitleOverlay(QWidget):
         self._font = QFont(cfg.font_family, cfg.font_size, QFont.Bold)
         self._source_font = QFont(cfg.font_family, max(10, int(cfg.font_size * 0.6)))
 
-        # Clears stale captions once the room goes quiet.
-        self._hold_timer = QTimer(self)
-        self._hold_timer.setSingleShot(True)
-        self._hold_timer.timeout.connect(self._on_hold_expired)
+        # Removes lines whose reading time is up. Only runs while something
+        # is on screen.
+        self._expiry_timer = QTimer(self)
+        self._expiry_timer.setInterval(200)
+        self._expiry_timer.timeout.connect(self._prune_expired)
 
         self._apply_geometry()
 
@@ -151,37 +157,51 @@ class SubtitleOverlay(QWidget):
 
     def push_partial(self, text: str, source_text: str = "") -> None:
         self._live = text
+        # A live line normally gets replaced by its finished version, but if
+        # that never arrives (the utterance turned out to be noise), don't
+        # leave it stranded on screen.
+        self._live_expires = time.monotonic() + self.cfg.line_max_sec
         if self.cfg.show_source_text:
             self._source_line = source_text
-        self._restart_hold()
+        self._expiry_timer.start()
         self.update()
 
     def push_final(self, text: str, source_text: str = "") -> None:
         if text:
-            self._committed.append(text)
+            seconds = display_seconds(
+                text, self.cfg.reading_cps, self.cfg.line_min_sec, self.cfg.line_max_sec
+            )
+            self._committed.append((text, time.monotonic() + seconds))
         self._live = ""
         if self.cfg.show_source_text:
             self._source_line = source_text
-        self._restart_hold()
+        self._expiry_timer.start()
         self.update()
 
     def clear(self) -> None:
         self._committed.clear()
         self._live = ""
         self._source_line = ""
+        self._expiry_timer.stop()
         self.update()
 
     # ------------------------------------------------------------------
-    def _restart_hold(self) -> None:
-        if self.cfg.hold_sec > 0:
-            self._hold_timer.start(int(self.cfg.hold_sec * 1000))
-
-    def _on_hold_expired(self) -> None:
-        self.clear()
+    def _prune_expired(self) -> None:
+        now = time.monotonic()
+        before = (len(self._committed), bool(self._live))
+        while self._committed and self._committed[0][1] <= now:
+            self._committed.popleft()
+        if self._live and self._live_expires <= now:
+            self._live = ""
+        if not self._committed and not self._live:
+            self._source_line = ""
+            self._expiry_timer.stop()
+        if (len(self._committed), bool(self._live)) != before:
+            self.update()
 
     # -- painting --------------------------------------------------------
     def paintEvent(self, event) -> None:  # noqa: N802 (Qt naming)
-        lines = list(self._committed)
+        lines = [text for text, _ in self._committed]
         if self._live:
             lines.append(self._live)
         if not lines and not self._source_line:

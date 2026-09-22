@@ -237,6 +237,10 @@ class SubtitlePipeline:
                 log.exception("segmenter failed")
                 continue
             for segment in segments:
+                # With the live line off nobody will see in-progress lines, so
+                # don't spend GPU time transcribing them.
+                if not segment.is_final and self.cfg.overlay.live_line == "off":
+                    continue
                 self._enqueue(self._asr_queue, _Job(segment, time.perf_counter()))
 
         # Commit whatever was mid-utterance when the user hit stop.
@@ -309,7 +313,15 @@ class SubtitlePipeline:
             segment, transcript = job.segment, job.transcript
             source_language = canonical_name(transcript.language, default="")
 
-            if not self._should_translate(segment, source_language, transcript):
+            if not segment.is_final:
+                action = self._live_line_action(transcript)
+                if action == "drop":
+                    continue
+                if action == "source":
+                    self._emit(job, transcript.text, 0.0, source_language)
+                    continue
+
+            if not self._should_translate(source_language, transcript):
                 self._emit(job, transcript.text, 0.0, source_language)
                 continue
 
@@ -330,23 +342,31 @@ class SubtitlePipeline:
 
             self._emit(job, result.text or transcript.text, result.latency, source_language)
 
-    def _should_translate(
-        self, segment: Segment, source_language: str, transcript: Transcript
-    ) -> bool:
+    def _live_line_action(self, transcript: Transcript) -> str:
+        """Decide what to do with an in-progress line: drop, source or translate."""
+        mode = self.cfg.overlay.live_line
+        if mode == "off":
+            # The setting was switched off while this line was in flight.
+            return "drop"
+        if mode == "original" or transcript.already_translated:
+            return "source"
+        # "translated": rate-limit so live updates can't starve finished
+        # lines. A throttled update is dropped, never shown untranslated --
+        # flashing the source language between translations is exactly the
+        # flicker this mode should avoid.
+        now = time.perf_counter()
+        throttle = self.cfg.translate.partial_throttle_ms
+        if (now - self._last_partial_translation) * 1000 < throttle:
+            return "drop"
+        self._last_partial_translation = now
+        return "translate"
+
+    def _should_translate(self, source_language: str, transcript: Transcript) -> bool:
         cfg = self.cfg.translate
         # Whisper's translate task already produced target-language text, so a
         # second pass would just translate English into English.
         if transcript.already_translated:
             return False
-        if not segment.is_final:
-            if not cfg.translate_partials:
-                return False
-            # Throttle the live line so it cannot starve the final queue.
-            now = time.perf_counter()
-            if (now - self._last_partial_translation) * 1000 < cfg.partial_throttle_ms:
-                return False
-            self._last_partial_translation = now
-
         if cfg.skip_if_target and same_language(source_language, cfg.target_language):
             return False
         return True

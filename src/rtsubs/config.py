@@ -109,9 +109,7 @@ class TranslateConfig:
     ct2_device: str = "cpu"
     ct2_compute_type: str = "int8"
     #: --- shared ---
-    #: Translate the live (not-yet-final) line too. Costs throughput.
-    translate_partials: bool = True
-    #: Minimum gap between partial translations.
+    #: Minimum gap between live-line translations (overlay.live_line = "translated").
     partial_throttle_ms: int = 450
     #: Skip translation when the detected source language already matches.
     skip_if_target: bool = True
@@ -131,8 +129,20 @@ class OverlayConfig:
     #: Fraction of screen width the caption box occupies.
     width_fraction: float = 0.78
     max_lines: int = 2
-    #: Committed lines are cleared after this long with no new speech.
-    hold_sec: float = 6.0
+    #: What to show while someone is still mid-sentence:
+    #:   "off"        -- nothing; each sentence appears once, when it is finished
+    #:   "original"   -- the untranslated transcript, growing as they speak
+    #:   "translated" -- a translation that is redone as the sentence grows
+    #: "off" is the default: languages that put the verb last (Japanese, Korean,
+    #: Turkish, Hindi...) force the English to be rewritten several times per
+    #: sentence, which is harder to read than waiting for the finished line.
+    live_line: str = "off"
+    #: Each finished line stays up for len(text) / reading_cps seconds, clamped
+    #: to [line_min_sec, line_max_sec]. 15 characters/second is a comfortable
+    #: subtitle reading speed.
+    reading_cps: float = 15.0
+    line_min_sec: float = 2.0
+    line_max_sec: float = 6.0
     #: When locked the overlay ignores the mouse entirely (click-through).
     locked: bool = True
     #: Also render the original-language text above the translation.

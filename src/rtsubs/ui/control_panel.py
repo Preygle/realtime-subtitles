@@ -196,8 +196,6 @@ class ControlPanel(QWidget):
             self.target_combo.addItem(label, value)
         grid.addWidget(self.target_combo, 3, 1)
 
-        self.translate_partials_check = QCheckBox("Translate the live line too")
-        grid.addWidget(self.translate_partials_check, 3, 2, 1, 2)
 
         self.whisper_translate_check = QCheckBox(
             "Whisper: translate to English in a single pass (skips the translator)"
@@ -257,6 +255,19 @@ class ControlPanel(QWidget):
         self.source_text_check.stateChanged.connect(self._push_overlay_settings)
         grid.addWidget(self.source_text_check, 2, 2, 1, 2)
 
+        grid.addWidget(QLabel("Live line"), 3, 0)
+        self.live_line_combo = QComboBox()
+        self.live_line_combo.addItem("Off - show each sentence once, when finished", "off")
+        self.live_line_combo.addItem("Original language, as they speak", "original")
+        self.live_line_combo.addItem("Translated, as they speak (can change)", "translated")
+        self.live_line_combo.setToolTip(
+            "What to show while someone is still mid-sentence.\n"
+            "Languages that put the verb last (Japanese, Korean...) make a live\n"
+            "translation rewrite itself several times, so Off is steadier."
+        )
+        self.live_line_combo.currentIndexChanged.connect(self._push_overlay_settings)
+        grid.addWidget(self.live_line_combo, 3, 1, 1, 3)
+
         return box
 
     def _build_controls(self) -> QWidget:
@@ -300,7 +311,7 @@ class ControlPanel(QWidget):
         self._select_data(self.translate_combo, cfg.translate.backend)
         self.translate_url.setText(cfg.translate.base_url)
         self._select_data(self.target_combo, cfg.translate.target_language)
-        self.translate_partials_check.setChecked(cfg.translate.translate_partials)
+        self._select_data(self.live_line_combo, cfg.overlay.live_line)
 
         self.font_spin.setValue(cfg.overlay.font_size)
         self.opacity_spin.setValue(cfg.overlay.background_opacity)
@@ -332,7 +343,6 @@ class ControlPanel(QWidget):
             self.translate_url.text().strip() or cfg.translate.base_url
         )
         cfg.translate.target_language = self.target_combo.currentData()
-        cfg.translate.translate_partials = self.translate_partials_check.isChecked()
 
         self._commit_overlay_config()
 
@@ -344,6 +354,7 @@ class ControlPanel(QWidget):
         overlay.vertical_anchor = self.anchor_spin.value()
         overlay.locked = self.lock_check.isChecked()
         overlay.show_source_text = self.source_text_check.isChecked()
+        overlay.live_line = self.live_line_combo.currentData() or "off"
 
     def _push_overlay_settings(self) -> None:
         if self._loading:
@@ -373,7 +384,6 @@ class ControlPanel(QWidget):
             self.translate_combo,
             self.translate_url,
             self.target_combo,
-            self.translate_partials_check,
         ):
             widget.setEnabled(not single_pass)
         self.translate_combo.setToolTip(

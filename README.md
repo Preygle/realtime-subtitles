@@ -98,10 +98,17 @@ in-progress lines are "latest wins"** — if the GPU falls behind, only the
 newest partial survives, so subtitles track the live audio instead of drifting
 further and further behind.
 
-While someone is still talking, the current sentence is re-transcribed every
-~700 ms and shown as a dimmer "live" line. When they pause, it's committed and
-never changes again. The overlay keeps at most two lines, rolling the oldest
-off the top — like TV captions.
+By default each sentence appears **once**, as soon as the speaker pauses, and
+never changes afterwards. The overlay keeps at most two lines, rolling the
+oldest off the top like TV captions, and each line stays up for as long as it
+takes to read (about 15 characters per second, between 2 and 6 seconds).
+
+You can also show a **live line** while someone is still mid-sentence, either
+in the original language or translated. Translated live lines are fine for
+Chinese or Spanish, which share English word order, but languages that put
+the verb last — Japanese, Korean, Turkish, Hindi — make the English rewrite
+itself several times per sentence, and the extra requests make finished lines
+arrive about 2.4× later. That's why it's off by default.
 
 ---
 
@@ -288,7 +295,20 @@ The GPU can't keep up. Check nothing else is competing for it — two copies of
 the app sharing one pair of servers roughly triples latency, and two copies of
 the servers running at once will spill weights into system RAM and slow everything
 down roughly 10×. Otherwise use `-Quant Q4_K_M`, raise
-`segmenter.partial_interval_ms`, or turn off `translate.translate_partials`.
+`segmenter.partial_interval_ms`, or set the **Live line** to Off (the default).
+</details>
+
+<details>
+<summary><b>Everything is slower than usual, but nothing else is using the GPU</b></summary>
+
+On laptops the GPU can sit in a low-power state: model requests are short
+bursts that keep the GPU only ~20% busy, which isn't enough for the driver to
+raise its clocks, so each request runs slowly and the cycle continues. On the
+test machine the same request varied between 0.3 s and 1.9 s depending on
+power state, with the GPU, CPU and memory otherwise idle. Try switching Windows
+to **Best performance** (Settings → System → Power) and your laptop vendor's
+tool (MSI Center, Armoury Crate, Legion Vantage…) to its performance profile,
+and keep the laptop plugged in.
 </details>
 
 <details>

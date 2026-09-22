@@ -44,7 +44,6 @@
     "ct2_tokenizer": "facebook/nllb-200-distilled-600M",
     "ct2_device": "cpu",
     "ct2_compute_type": "int8",
-    "translate_partials": true,
     "partial_throttle_ms": 450,
     "skip_if_target": true
   },
@@ -58,7 +57,10 @@
     "vertical_anchor": 0.86,
     "width_fraction": 0.78,
     "max_lines": 2,
-    "hold_sec": 6.0,
+    "live_line": "off",
+    "reading_cps": 15.0,
+    "line_min_sec": 2.0,
+    "line_max_sec": 6.0,
     "locked": true,
     "show_source_text": false
   },
