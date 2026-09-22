@@ -133,10 +133,11 @@ class OverlayConfig:
     #:   "off"        -- nothing; each sentence appears once, when it is finished
     #:   "original"   -- the untranslated transcript, growing as they speak
     #:   "translated" -- a translation that is redone as the sentence grows
-    #: "off" is the default: languages that put the verb last (Japanese, Korean,
-    #: Turkish, Hindi...) force the English to be rewritten several times per
-    #: sentence, which is harder to read than waiting for the finished line.
-    live_line: str = "off"
+    #: "translated" is the default: text appears while the person is still
+    #: talking. Languages that put the verb last (Japanese, Korean, Turkish,
+    #: Hindi...) make it reword itself as the sentence completes; "off" avoids
+    #: that, but then nothing shows until the speaker pauses.
+    live_line: str = "translated"
     #: Each finished line stays up for len(text) / reading_cps seconds, clamped
     #: to [line_min_sec, line_max_sec]. 15 characters/second is a comfortable
     #: subtitle reading speed.

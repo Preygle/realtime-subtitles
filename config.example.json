@@ -57,7 +57,7 @@
     "vertical_anchor": 0.86,
     "width_fraction": 0.78,
     "max_lines": 2,
-    "live_line": "off",
+    "live_line": "translated",
     "reading_cps": 15.0,
     "line_min_sec": 2.0,
     "line_max_sec": 6.0,

@@ -98,17 +98,16 @@ in-progress lines are "latest wins"** — if the GPU falls behind, only the
 newest partial survives, so subtitles track the live audio instead of drifting
 further and further behind.
 
-By default each sentence appears **once**, as soon as the speaker pauses, and
-never changes afterwards. The overlay keeps at most two lines, rolling the
-oldest off the top like TV captions, and each line stays up for as long as it
-takes to read (about 15 characters per second, between 2 and 6 seconds).
+While someone is talking, the current sentence is translated as it grows and
+shown as a dimmer **live line**; when they pause it's committed and never
+changes again. The overlay keeps at most two lines, rolling the oldest off the
+top like TV captions, and each line stays up for as long as it takes to read
+(about 15 characters per second, between 2 and 6 seconds).
 
-You can also show a **live line** while someone is still mid-sentence, either
-in the original language or translated. Translated live lines are fine for
-Chinese or Spanish, which share English word order, but languages that put
-the verb last — Japanese, Korean, Turkish, Hindi — make the English rewrite
-itself several times per sentence, and the extra requests make finished lines
-arrive about 2.4× later. That's why it's off by default.
+Languages that put the verb last — Japanese, Korean, Turkish, Hindi — make the
+live English reword itself as the sentence completes. If that bothers you, set
+**Live line** to *Off* in the control panel: each sentence then appears once,
+unchanged, but only after the speaker pauses, so text shows up later.
 
 ---
 
