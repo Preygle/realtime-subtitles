@@ -30,6 +30,7 @@ one app, or need an NVIDIA card. This one:
 - 🌏 **30 languages → English.** Auto-detects the spoken language, or you pick one.
 - 🟥 **Works on AMD GPUs.** Uses llama.cpp's Vulkan backend: no CUDA, no ROCm, no DirectML. Vulkan also covers NVIDIA and Intel GPUs (untested so far).
 - 🪟 **Click-through overlay.** Subtitles float on top of everything and your mouse passes straight through them.
+- 🎞️ **Subtitles existing files too.** Point it at a video or audio file and get `.srt` / `.vtt` / `.txt` back, many times faster than real time.
 - 📝 **Saves transcripts.** Optionally records every line as `.srt` / `.vtt` subtitles or a timestamped `.txt` transcript — handy for meeting notes or summaries.
 - 📜 **Stable text.** Committed lines never rewrite themselves — no flickering, no words changing while you read.
 - 🧪 **Measured, not claimed.** Benchmarked against a human transcript of a full hour of real conversation ([below](#-benchmark-1-hour-of-real-japanese-conversation)).
@@ -270,12 +271,32 @@ python -m rtsubs --language Japanese            # skip auto-detect
 python -m rtsubs --target Spanish               # subtitles in another language
 python -m rtsubs --wav clip.wav                 # caption a recording
 python -m rtsubs --save srt,txt                 # also save subtitles + a transcript
+python -m rtsubs --file movie.mkv               # subtitle a file, then exit
 ```
 
 - **Ctrl + Shift + S** hides/shows the subtitles without stopping recognition.
 - Uncheck **Click-through** in the control panel to drag the subtitles somewhere else.
 - **Hotwords / context** takes names or jargon (e.g. a streamer's name, game terms) to improve recognition of them.
 - All settings are saved to `config.json`; `config.example.json` lists every option.
+
+### Subtitling a video or audio file
+
+Live captioning is paced by the clock. To subtitle something you already have,
+click **Subtitle a file...** in the control panel (or use `--file`) and the same
+models run at full speed instead:
+
+```powershell
+python -m rtsubs --file "lecture.mp4"                 # writes lecture.srt beside it
+python -m rtsubs --file talk.mkv --save srt,vtt,txt   # all three formats
+python -m rtsubs --file interview.mp3 --language Japanese --target English
+python -m rtsubs --file movie.mkv --out D:\subs      # write somewhere else
+```
+
+Subtitles are named after the media and saved next to it, so players pick them
+up automatically. Anything ffmpeg can read works (mp4, mkv, mov, webm, mp3,
+m4a, wav...); plain `.wav` files need no ffmpeg at all. The window shows a
+progress bar with an ETA, lists lines as they are recognized, and can be
+cancelled part-way — the lines already written are kept.
 
 ### Saving subtitles and transcripts
 

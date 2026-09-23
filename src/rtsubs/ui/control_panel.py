@@ -70,6 +70,7 @@ class ControlPanel(QWidget):
     stop_requested = Signal()
     overlay_settings_changed = Signal()
     clear_requested = Signal()
+    subtitle_file_requested = Signal()
     closed = Signal()
 
     def __init__(self, cfg: AppConfig) -> None:
@@ -348,6 +349,14 @@ class ControlPanel(QWidget):
         clear = QPushButton("Clear overlay")
         clear.clicked.connect(self.clear_requested.emit)
         row.addWidget(clear, stretch=1)
+
+        subtitle_file = QPushButton("Subtitle a file...")
+        subtitle_file.setToolTip(
+            "Transcribe and translate an existing video or audio file, much "
+            "faster than real time, and write .srt/.vtt/.txt next to it."
+        )
+        subtitle_file.clicked.connect(self.subtitle_file_requested.emit)
+        row.addWidget(subtitle_file, stretch=1)
 
         self.status_label = QLabel("Idle")
         self.status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)

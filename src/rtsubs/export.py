@@ -120,19 +120,27 @@ class TranscriptRecorder:
         started_at: dt.datetime | None = None,
         source_description: str = "",
         target_language: str = "",
+        stem: str = "",
+        directory: Path | str = "",
+        clock_times: bool = True,
     ) -> None:
         self.cfg = cfg
         self.started_at = started_at or dt.datetime.now()
         self.source_description = source_description
         self.target_language = target_language
+        #: Subtitling a file wants times counted from the start of the media,
+        #: not the wall clock it happened to be processed at.
+        self.clock_times = clock_times
 
-        folder = Path(cfg.directory)
+        folder = Path(directory or cfg.directory)
         if not folder.is_absolute():
             folder = PROJECT_ROOT / folder
         folder.mkdir(parents=True, exist_ok=True)
         self.folder = folder
 
-        stem = self.started_at.strftime("%Y-%m-%d_%H-%M-%S")
+        # Files are named after the media when subtitling a file, so players
+        # pick the subtitles up automatically, and after the time otherwise.
+        stem = stem or self.started_at.strftime("%Y-%m-%d_%H-%M-%S")
         self.paths: dict[str, Path] = {}
         self._files: dict[str, TextIO] = {}
         formats = [f for f in cfg.formats if f in FORMATS]
@@ -155,6 +163,8 @@ class TranscriptRecorder:
         if "txt" in self._files:
             when = self.started_at.strftime("%Y-%m-%d %H:%M")
             header = [f"Transcript - {when}"]
+            if not self.clock_times:
+                header.append("times are positions in the media")
             details = []
             if self.source_description:
                 details.append(f"audio: {self.source_description}")
@@ -208,8 +218,13 @@ class TranscriptRecorder:
                 )
 
     def _write_text(self, event: "SubtitleEvent", text: str) -> None:
-        clock = self.started_at + dt.timedelta(seconds=event.start_time)
-        line = f"[{clock.strftime('%H:%M:%S')}] {text}\n"
+        if self.clock_times:
+            stamp = (self.started_at + dt.timedelta(seconds=event.start_time)).strftime(
+                "%H:%M:%S"
+            )
+        else:
+            stamp = _timestamp(event.start_time, ".")[:8]  # position in the media
+        line = f"[{stamp}] {text}\n"
         source = " ".join(event.source_text.split())
         if self.cfg.include_original and source and source != text:
             language = f"{event.language}: " if event.language else ""

@@ -50,6 +50,7 @@ class SubtitleApp:
         self.panel.stop_requested.connect(self.stop)
         self.panel.overlay_settings_changed.connect(self._apply_overlay_settings)
         self.panel.clear_requested.connect(self.overlay.clear)
+        self.panel.subtitle_file_requested.connect(self._open_file_dialog)
         self.panel.bind_stats(self._stats)
         # closeEvent fires while the C++ objects are still alive; `destroyed`
         # fires after deletion, which makes touching the overlay a crash.
@@ -125,6 +126,23 @@ class SubtitleApp:
 
     def _on_status(self, level: str, message: str) -> None:
         self.panel.append_log(level, message)
+
+    def _open_file_dialog(self) -> None:
+        """Open (or re-focus) the window that subtitles an existing file."""
+        from .file_dialog import FileSubtitleDialog
+
+        if getattr(self, "_file_dialog", None) is None:
+            self._file_dialog = FileSubtitleDialog(self.cfg, self.panel)
+            self._file_dialog.finished.connect(lambda *_: setattr(self, "_file_dialog", None))
+        if self.pipeline is not None:
+            self.panel.append_log(
+                "warn",
+                "Live captioning is running: it and the file job share the GPU, "
+                "so both will be slower.",
+            )
+        self._file_dialog.show()
+        self._file_dialog.raise_()
+        self._file_dialog.activateWindow()
 
     def _apply_overlay_settings(self) -> None:
         self.overlay.apply_config(self.cfg.overlay)

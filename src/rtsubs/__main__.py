@@ -6,6 +6,7 @@
     python -m rtsubs --check              # probe the model servers and exit
     python -m rtsubs --wav clip.wav --asr mock --translate passthrough
     python -m rtsubs --console --save srt,txt   # also save subtitles + transcript
+    python -m rtsubs --file movie.mkv           # subtitle a file, then exit
 """
 
 from __future__ import annotations
@@ -46,6 +47,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--check", action="store_true", help="probe backends and exit"
     )
+    parser.add_argument(
+        "--file",
+        type=Path,
+        metavar="MEDIA",
+        help="subtitle a video/audio file as fast as possible and exit",
+    )
+    parser.add_argument("--out", type=Path, help="--file: where to write (default: next to the media)")
     parser.add_argument("--wav", type=Path, help="replay a WAV file instead of a device")
     parser.add_argument("--loop-wav", action="store_true", help="loop the WAV file")
 
@@ -137,6 +145,64 @@ def cmd_devices() -> int:
             f"      backend={device.backend} channels={device.channels} "
             f"rate={device.sample_rate}{default}"
         )
+    return 0
+
+
+def cmd_file(cfg: AppConfig, args: argparse.Namespace) -> int:
+    """Subtitle one media file, showing progress on a single line."""
+    from .offline import MediaError, subtitle_file
+
+    def human(seconds: float) -> str:
+        m, s = divmod(int(seconds), 60)
+        h, m = divmod(m, 60)
+        return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+    last = [0.0]
+
+    def on_progress(p) -> None:
+        now = time.monotonic()
+        if p.fraction < 1.0 and now - last[0] < 0.25:
+            return
+        last[0] = now
+        bar_width = 28
+        filled = int(bar_width * p.fraction)
+        eta = f" ETA {human(p.eta_seconds)}" if p.eta_seconds > 1 else ""
+        print(
+            f"\r  [{'#' * filled}{'.' * (bar_width - filled)}] {p.fraction * 100:5.1f}%  "
+            f"{human(p.media_position)}/{human(p.media_seconds)}{eta}   ",
+            end="",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    print(f"Subtitling {args.file.name}", file=sys.stderr, flush=True)
+    try:
+        result = subtitle_file(
+            args.file,
+            cfg,
+            output_dir=args.out or args.save_dir,
+            formats=cfg.export.formats,
+            on_progress=on_progress,
+        )
+    except MediaError as exc:
+        print(f"\n{exc}", file=sys.stderr)
+        return 1
+    print(file=sys.stderr)
+
+    if not result.lines:
+        print("No speech found.", file=sys.stderr)
+        return 1
+    languages = ", ".join(
+        f"{name} ({count})" for name, count in sorted(result.languages.items(), key=lambda kv: -kv[1])
+    )
+    print(
+        f"{result.lines} lines from {human(result.media_seconds)} of media "
+        f"in {human(result.elapsed_seconds)} ({result.speed:.1f}x real time)\n"
+        f"Detected: {languages}",
+        file=sys.stderr,
+    )
+    for path in result.outputs.values():
+        print(path)
     return 0
 
 
@@ -237,6 +303,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.devices:
         return cmd_devices()
+    if args.file:
+        return cmd_file(cfg, args)
     if args.check:
         return cmd_check(cfg)
     if args.console or args.wav:
