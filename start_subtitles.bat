@@ -34,8 +34,12 @@ if errorlevel 1 (
     echo  [x] Python was not found on PATH.
     goto :fail
 )
+rem The translator chosen in the app decides which model the translation
+rem server loads; translators that need no server (NLLB) print nothing.
+set "MT_MODEL="
+for /f "usebackq delims=" %%m in (`python -c "from rtsubs.config import AppConfig; from rtsubs.translate.registry import server_model_file; print(server_model_file(AppConfig.load().translate))"`) do set "MT_MODEL=%%m"
 set "MISSING=0"
-for %%f in (Confucius4-R2T2-Q8_0.gguf mmproj-Confucius4-R2T2-f16.gguf Qwen3-4B-Instruct-2507-Q4_K_M.gguf) do (
+for %%f in (Confucius4-R2T2-Q8_0.gguf mmproj-Confucius4-R2T2-f16.gguf %MT_MODEL%) do (
     if not exist "%ROOT%models\%%f" (
         echo  [x] Missing model: models\%%f
         set "MISSING=1"
@@ -43,6 +47,7 @@ for %%f in (Confucius4-R2T2-Q8_0.gguf mmproj-Confucius4-R2T2-f16.gguf Qwen3-4B-I
 )
 if "%MISSING%"=="1" (
     echo      Run: powershell -ExecutionPolicy Bypass -File scripts\download_models.ps1
+    echo      ^(other translator models: see README, "Choosing a translator"^)
     goto :fail
 )
 
@@ -59,14 +64,20 @@ if errorlevel 1 (
     echo  [ok] Speech recognition server already running
 )
 
+if not defined MT_MODEL (
+    echo  [ok] The chosen translator needs no translation server
+    goto :mt_started
+)
 call :is_up "%MT_URL%"
 if errorlevel 1 (
-    echo  [..] Starting translation server ^(Qwen3-4B, port 8081^)
-    call :launch run_translator_server translator_server
+    echo  [..] Starting translation server ^(%MT_MODEL%, port 8081^)
+    call :launch run_translator_server translator_server %MT_MODEL%
     set "STARTED_MT=1"
 ) else (
     echo  [ok] Translation server already running
+    call :check_mt_model
 )
+:mt_started
 
 rem ------------------------------------------------- wait until healthy
 echo  [..] Waiting for the models to load onto the GPU ^(about 20 seconds^)
@@ -74,6 +85,7 @@ set /a WAITED=0
 :wait
 call :is_up "%ASR_URL%"
 if errorlevel 1 goto :not_yet
+if not defined MT_MODEL goto :ready
 call :is_up "%MT_URL%"
 if errorlevel 1 goto :not_yet
 goto :ready
@@ -154,10 +166,12 @@ for /f %%c in ('curl.exe -s -o nul -m 2 -w "%%{http_code}" "%~1" 2^>nul') do set
 if "%CODE%"=="200" exit /b 0
 exit /b 1
 
-rem :launch <script name> <log name>  -> starts a hidden server, records its PID
+rem :launch <script name> <log name> [model file]  -> starts a hidden server, records its PID
 :launch
+set "EXTRA="
+if not "%~3"=="" set "EXTRA=,'-ModelFile','%~3'"
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$p = Start-Process powershell.exe -WindowStyle Hidden -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','%ROOT%scripts\%~1.ps1' -RedirectStandardOutput '%ROOT%logs\%~2.log' -RedirectStandardError '%ROOT%logs\%~2.err.log'; $p.Id | Out-File -Encoding ascii '%ROOT%logs\%~2.pid'"
+  "$p = Start-Process powershell.exe -WindowStyle Hidden -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','%ROOT%scripts\%~1.ps1'%EXTRA% -RedirectStandardOutput '%ROOT%logs\%~2.log' -RedirectStandardError '%ROOT%logs\%~2.err.log'; $p.Id | Out-File -Encoding ascii '%ROOT%logs\%~2.pid'"
 exit /b 0
 
 rem :alive <log name>  -> errorlevel 0 while the launched server is still running
@@ -168,6 +182,12 @@ for /f "usebackq" %%p in ("%ROOT%logs\%~1.pid") do (
     exit /b
 )
 exit /b 1
+
+rem :check_mt_model  -> warn when the running translation server has another model
+:check_mt_model
+curl.exe -s -m 2 http://127.0.0.1:8081/v1/models 2>nul | find /i "%MT_MODEL%" >nul
+if errorlevel 1 echo  [!!] It has a different model loaded than %MT_MODEL% - stop it to switch translators.
+exit /b 0
 
 rem :stop <log name>  -> kills the server started by :launch (and its children)
 :stop

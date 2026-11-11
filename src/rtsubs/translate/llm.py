@@ -53,7 +53,7 @@ class LlmTranslator(Translator):
         payload = {
             "model": self.cfg.model,
             "messages": messages,
-            "temperature": self.cfg.temperature,
+            "temperature": self._temperature(),
             "max_tokens": self.cfg.max_tokens,
             "stream": False,
             # Qwen3 and friends: keep reasoning off, it wrecks latency.
@@ -83,6 +83,9 @@ class LlmTranslator(Translator):
             ) from exc
 
         return Translation(text=clean_translation(content or ""), latency=latency)
+
+    def _temperature(self) -> float:
+        return self.cfg.temperature
 
     def _build_messages(self, request: TranslationRequest) -> list[dict[str, str]]:
         target = request.target_language

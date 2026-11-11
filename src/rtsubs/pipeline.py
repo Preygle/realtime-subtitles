@@ -179,7 +179,7 @@ class SubtitlePipeline:
         self._translator = create_translator(self.cfg.translate)
         ok, detail = self._translator.health()
         self._on_status("info" if ok else "error", f"Translator: {detail}")
-        if not ok and self.cfg.translate.backend == "llamacpp":
+        if not ok and self.cfg.translate.backend in ("llamacpp", "index"):
             raise RuntimeError(f"Translation backend not ready -- {detail}")
 
         vad = create_vad(self.cfg.vad)

@@ -252,10 +252,43 @@ turns its output into English.
 
 | Swap | Command | Trade-off |
 |---|---|---|
+| **Index-Translate-2B** | pick it under **Translator**, or `--translate index` | A dedicated translation model: **more accurate** than the default in our test, ~0.9 GB less VRAM, same speed. See [below](#index-translate). |
 | **Whisper, single pass** | `python -m rtsubs --asr whispercpp` | Transcribes *and* translates to English in one model (~1.5 GB VRAM), but may rewrite words already on screen. Needs a whisper.cpp server; see [below](#whisper-single-pass-mode). |
 | **NLLB-200 on CPU** | `python -m rtsubs --translate nllb` | Frees the translator's VRAM entirely; 200 languages; weaker on idiom and no cross-line context. Run `scripts/convert_nllb.py` first. |
 | **No translation** | `python -m rtsubs --translate passthrough` | Subtitles in the original language. |
 | **Smaller ASR** | `scripts\run_asr_server.ps1 -Quant Q4_K_M` | 1.3 GB instead of 2.5 GB, slightly less accurate. |
+
+### Index-Translate
+
+[Index-Translate](https://github.com/bilibili/Index-Translate) (IndexTeam, Apache-2.0) is a
+model trained only to translate, covering 150 languages. Suggested in
+[Preygle/realtime-subtitles#1](https://github.com/Preygle/realtime-subtitles/issues/1).
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\download_models.ps1 -TranslatorOnly -TranslatorRepo IndexTeam/Index-Translate-2B-GGUF -TranslatorFile Index-Translate-2B.Q8_0.gguf
+```
+
+Then choose **Index-Translate** under **Translator** in the control panel.
+`start_subtitles.bat` loads whichever model the chosen translator needs, so
+nothing else changes.
+
+**How it compares** — 200 sentences each from the WMT22 test sets, which come
+with professional reference translations, scored with sacrebleu on an
+RX 6700M. Both translators get isolated sentences, as in standard evaluation.
+
+| | Qwen3-4B `Q4_K_M` (default) | Index-Translate-2B `Q8_0` |
+|---|---|---|
+| Japanese → English, BLEU / chrF | 18.3 / 44.5 | **21.6 / 46.9** |
+| Chinese → English, BLEU / chrF | 16.2 / 48.6 | **20.3 / 53.0** |
+| VRAM | 2.97 GB | **2.06 GB** |
+| Time per line, ja / zh | 434 / 694 ms | 493 / 715 ms |
+| Generation speed | 66 tokens/s | **77 tokens/s** |
+
+All four quality gains are statistically significant (paired bootstrap,
+p ≤ 0.005). It generates faster per token but writes fuller sentences —
+Qwen's subtitle prompt asks it to keep lines short — so time per line ends up
+about the same. Only Japanese and Chinese were measured; reproduce or extend
+with `scripts/benchmark_translation.py`.
 
 ---
 

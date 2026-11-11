@@ -69,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--language", help='spoken language, or "" to auto-detect')
     parser.add_argument(
         "--translate", dest="translate_backend",
-        choices=("llamacpp", "nllb", "passthrough"),
+        choices=("llamacpp", "index", "nllb", "passthrough"),
     )
     parser.add_argument("--translate-url")
     parser.add_argument("--target", help="subtitle language (default: English)")

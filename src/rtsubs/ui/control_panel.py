@@ -181,6 +181,7 @@ class ControlPanel(QWidget):
             self.translate_combo.addItem(
                 {
                     "llamacpp": "LLM via llama.cpp (best quality)",
+                    "index": "Index-Translate (llama.cpp, dedicated MT)",
                     "nllb": "NLLB-200 on CPU (fastest)",
                     "passthrough": "None - show original text",
                 }.get(backend, backend),
